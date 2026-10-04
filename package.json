@@ -1,6 +1,6 @@
 {
   "name": "@l1nway/collapse",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Animate a block in and out by height or width. Zero dependencies.",
   "license": "MIT",
   "type": "module",

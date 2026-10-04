@@ -2,7 +2,7 @@ import {afterEach, describe, expect, test, vi} from 'vitest'
 import {createRef} from 'react'
 import {renderToReadableStream, renderToString} from 'react-dom/server'
 import {prerender} from 'react-dom/static'
-import {Collapse, Presence} from '../src/index.js'
+import {Collapse, Presence, clamp} from '../src/index.js'
 
 const read = stream => new Response(stream).text()
 const RENDERERS = {
@@ -32,7 +32,7 @@ describe('import', () => {
         trap('document')
         vi.resetModules()
         const entry = await import('../src/index.js')
-        expect(Object.keys(entry).sort()).toEqual(['Collapse', 'Presence'])
+        expect(Object.keys(entry).sort()).toEqual(['Collapse', 'Presence', 'clamp', 'createClamp'])
         expect(touched).toEqual([])
     })
 })
@@ -58,6 +58,11 @@ describe('Collapse on the server', () => {
     test('as renders the given tag', async () => {
         expect(await server(<Collapse in as='section' id='box'>hi</Collapse>)).toBe('<section id="box">hi</section>')
         expect(await server(<Collapse in as='li' axis='x' fade>hi</Collapse>)).toBe('<li>hi</li>')
+    })
+
+    test('clamp keeps a hidden element rendered, unstyled on the server', async () => {
+        const plugins = [clamp]
+        expect(await server(<Collapse as='p' plugins={plugins} in={false}>hi</Collapse>)).toBe('<p>hi</p>')
     })
 
     test('a consumer style passes through untouched', async () => {

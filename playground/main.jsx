@@ -1,6 +1,6 @@
 import {StrictMode, useRef, useState} from 'react'
 import {createRoot} from 'react-dom/client'
-import {Collapse, Presence} from '../src/index.js'
+import {Collapse, Presence, clamp} from '../src/index.js'
 
 const Toggle = ({value, set, label = 'toggle'}) => <button type='button' onClick={() => set(!value)}>{label}: {String(value)}</button>
 
@@ -112,7 +112,25 @@ function Nested({duration}) {
     </>
 }
 
+const CLAMP = [clamp]
+const TEXT = 'A shelf description of any length. It wraps around the avatar at rest, while it opens and when open; '
+
+function Clamp({duration}) {
+    const [open, setOpen] = useState(false)
+    const [words, setWords] = useState(4)
+    return <>
+        <button type='button' onClick={() => setWords(words === 4 ? 1 : 4)}>{words === 4 ? 'short text' : 'long text'}</button>
+        <div>
+            <span className='avatar'/>
+            <Collapse as='p' plugins={CLAMP} in={open} duration={duration} data-open={open || undefined} className='clamp'
+                onClick={() => setOpen(!open)}>{TEXT.repeat(words)}</Collapse>
+        </div>
+        <p className='below'>click the text; the "… more" fades with the height</p>
+    </>
+}
+
 const cards = [
+    ['clamp: expand from 3 lines', Clamp],
     ['Enter, exit, reverse', Basic],
     ['axis x + fade, inline', Horizontal],
     ['Frozen children while leaving', Kept],

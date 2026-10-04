@@ -19,6 +19,10 @@
             .chip {display: inline-block; background: #fde68a; padding: 2px 8px; margin: 0 6px; border-radius: 99px}
             .item {display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid #ddd}
             .item button {margin: 0}
+            .avatar {float: left; width: 80px; height: 80px; margin: 0 8px 0 0; border-radius: 50%; background: #6366f1}
+            .clamp {position: relative; margin: 0 0 8px; line-height: 1.4; cursor: pointer}
+            .clamp::after {content: '… more'; position: absolute; right: 0; bottom: 0; padding-left: 4px; background: #fff; font-weight: bold; opacity: 0; transition: opacity 300ms}
+            .clamp[data-overflow]:not([data-open])::after {opacity: 1}
         </style>
     </head>
     <body>

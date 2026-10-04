@@ -10,6 +10,8 @@ Rationale behind the doc-keys in `src/`. The public contract is in the root `REA
 - `playbackRate` after `reverse()` still reads the old value until the pending rate applies: `await animation.ready` first.
 - A `MutationObserver` changes what it observes: it forces Chromium/WebKit to serialize the inline style (see Collapse Measure). Collect its records in the callback; `takeRecords()` after an `await` is empty.
 - Several runs in parallel need distinct ports: `--api.port=<n>`.
+- Do not `pause()` an animation before toggling to test a reverse: a paused animation is not `running`, so the core cancels it and starts a new one from the measured size.
+- Known flakes, present before plugins too: "Failed to connect to the browser session … [browser (firefox)]" now and then on a full `npm test` (all tests still pass), and the WebKit reverse tests in `collapse.core` under heavy load (real time runs the 400 ms reverse out before `settle()` returns).
 
 ## Build Jsx
 
@@ -29,19 +31,20 @@ Rationale behind the doc-keys in `src/`. The public contract is in the root `REA
 
 - Collapsed frame: every property of `AXES[axis]` is `0px` (size, both margins, both paddings, both border widths), plus `opacity: 0` with `fade`. A styled element can be the Collapse itself, no wrapper needed.
 - With a border, a middle frame is added (see Collapse Edge).
-- Every frame carries `overflow: hidden`, `text-overflow: clip`, `box-sizing: border-box` (see Collapse Border Box) and the lifted limits of the axis (`LIMITS`: `min-*: 0`, `max-* : none`). While it animates, the animation owns the size. The measured target already includes the element's own limits. Without the lift a consumer `min-height` stops a collapse halfway, and an ellipsis slides with a growing line.
+- Every frame carries `overflow: hidden`, `text-overflow: clip`, `box-sizing: border-box` (see Collapse Border Box), the lifted limits of the axis and, last, every plugin's `frame` (see Collapse Plugins) (`LIMITS`: `min-*: 0`, `max-* : none`). While it animates, the animation owns the size. The measured target already includes the element's own limits. Without the lift a consumer `min-height` stops a collapse halfway, and an ellipsis slides with a growing line.
 - Fill: an opening animation uses `fill: 'backwards'`, a closing one `fill: 'both'`. Every animation that ends open leaves no trace (it is also cancelled in `finish`), every one that ends closed holds 0 until unmount or reopen. The close fill also covers the before phase: Chrome may resolve the start time a little after the current frame, and with `forwards` only the element would flash its natural size for that instant.
 - When an open finishes, the animation is cancelled: a reversed close keeps `fill: 'both'`, and its backwards fill would otherwise hold the measured size and the clip, clipping later content growth.
 
 ## Collapse Measure
 
-- The target is read with `getComputedStyle` under a temporary inline `overflow: hidden`, restored in the same task. That is the box the animation renders: the clipped element is a block formatting context and contains the first / last child margins. At rest those margins collapse through the element and are not part of its `height`. Measured without the clip, the open ended short by the margin and the margin popped out when the clip went (seen as a 16 px jump in the demo's Styling panel).
+- `measure()` reads one frame; it runs once for the open frame and, with a plugin `closed`, once more for the closed frame (see Collapse Plugins).
+- The target is read with `getComputedStyle` under a temporary inline `overflow` equal to the frames' one (`hidden`, or a plugin's `clip`), restored in the same task. That is the box the animation renders: the clipped element is a block formatting context and contains the first / last child margins. At rest those margins collapse through the element and are not part of its `height`. Measured without the clip, the open ended short by the margin and the margin popped out when the clip went (seen as a 16 px jump in the demo's Styling panel).
 - Limit: a collapsed-through margin that also merges with a margin outside the element (the next sibling's `margin-top`) still moves by the merged part.
 - Order: nested animations are seeked first, then the rest box is read (`getBoundingClientRect().bottom`, no clip, for Collapse Margin Shift), then the clip is set and the computed values and the clipped box are read. Two forced layouts per transition.
 - Measured once per transition. Content that changes size mid-animation snaps at the end; changes while open are natural layout.
 - Rejected: permanent `display: flow-root` (an inline `display` overrides a consumer class such as `display: grid`); negative margins, `clip-path`, `transform` (cheaper, looks cheap; see `CLAUDE.md`).
 
-- An empty `style` attribute left by the measurement (the element had no inline style) is removed, so the element ends exactly as the consumer rendered it.
+- An empty `style` attribute left by the measurement (the element had no inline style) is removed (`tidy`, also used by `clamp`), so the element ends exactly as the consumer rendered it.
 - Trap: the check must read `el.getAttribute('style')`, not `el.style.length`. Chromium and WebKit serialize the inline style into the attribute lazily: after `removeAttribute('style')` on a still-dirty declaration, the next read re-serializes it as `''`. Reading the attribute first forces the sync. A `MutationObserver` on the element also forces it, which hides the bug in a traced test.
 
 ## Collapse Border Box
@@ -57,7 +60,7 @@ Rationale behind the doc-keys in `src/`. The public contract is in the root `REA
 - Why: a border under 1 device px still paints and lays out as 1 device px, and in `border-box` the box cannot be smaller than its paddings plus borders. Without the frame the first instant of an open and the last of a close showed a strip of 2 device px plus paddings that then vanished at once (about 2 px at 2000 ms in Firefox, the same in Chromium and WebKit).
 - Paddings go to 0 with the borders so that just above the frame the 3 px size always fits the snapped borders (2 device px, up to DPR 0.67) plus the paddings; with paddings scaled linearly a box of mostly padding would still grow.
 - The size, margins and opacity stay linear in the eased progress (keyframe offsets are in the eased progress, `easing` is on the effect), so the box and the layout around it move exactly as with two frames. Only the content inside the clip moves on a kink at 3 px.
-- No border, or an open size of 3 px or less: two frames, as before. Without a border the frame would only zero the paddings, there is nothing to fix.
+- No border, an open size of 3 px or less, or a plugin `closed` (the closed box is not 0 and keeps its paddings): two frames, as before. Without a border the frame would only zero the paddings, there is nothing to fix.
 - The value is computed by scaling the number in each computed open value (`replace`), so margins keep their sign and the margin shift.
 
 ## Collapse Margin Shift
@@ -86,11 +89,12 @@ Rationale behind the doc-keys in `src/`. The public contract is in the root `REA
 
 - Hidden and unchanged (mount hidden with `unmountOnExit={false}`, or the element appeared later): a zero-length `[closed, closed]` animation with `fill: 'forwards'` holds the element at 0 without animating.
 - The hold is set whenever the current animation does not target the current element. A ref is not a dependency, so the effect re-runs on `mounted` and `as`: an element rendered later (`unmountOnExit` turned `false` while hidden, or another tag) gets its own hold instead of rendering at full size, and an element rendered again does not rely on the old element's hold.
+- With a plugin `closed` there is no hold: `closed(el, true)` puts the element in its closed rest instead (see Collapse Plugins).
 - Hidden at rest and `unmountOnExit` turns `true`: an element that never opened unmounts; one that closed while `unmountOnExit` was `false` stays mounted, held at 0, until its next close.
 
 ## Collapse Frozen
 
-- While leaving (and while hidden but mounted) the element renders `kept`: the last children it got while shown. A panel whose content depends on the state that hides it (a list that became empty) does not flash its empty state while it collapses. framer's `AnimatePresence` behaves the same way, and the demo's Safety panel relies on it.
+- While leaving (and while hidden but mounted) the element renders `kept`: the last children it got while shown. A panel whose content depends on the state that hides it (a list that became empty) does not flash its empty state while it collapses. framer's `AnimatePresence` behaves the same way, and the demo's Safety panel relies on it. Exception: when a plugin owns the closed rest (`closed` hook) the closed element is visible content, so it always renders the live `children` (a clamped description must follow its text); the no-flash guard does not apply to it.
 - `kept` is state adjusted during render (React's "store information from previous renders" pattern). While shown, a new `children` identity (every parent render) re-runs the component function once before its children render; the subtree is not rendered twice. A ref written in an effect would avoid the re-run but reads a ref during render, which React and its lint rules reject.
 - Gotcha: a consumer that wants live content during the exit must keep it in the shown state (for example close with `in` and change the content after `onExited`).
 
@@ -114,6 +118,39 @@ Rationale behind the doc-keys in `src/`. The public contract is in the root `REA
 - The cleanup clears `alive` and, one microtask later, cancels the animation only if the component did not reconnect (a real unmount, or a hidden `<Activity>`). StrictMode reconnects synchronously in the same commit, so its animation survives. After an `<Activity>` reveal the hold is set again (its target check fails because `anim.current` was cleared).
 - `alive` keeps a finish that lands after a real unmount from calling back.
 - Rejected: cancelling synchronously on cleanup; every StrictMode remount lost its animation and snapped to full size.
+
+## Collapse Plugins
+
+- `plugins` (default `NONE`, a module-level empty array) is a list of plain objects. Every member is optional; the core never imports a plugin, so an unused one is tree-shaken.
+  - `unmountOnExit: false` changes the default of the prop (an explicit prop still wins).
+  - `frame`: styles merged last into every keyframe, also the `overflow` the measurement uses.
+  - `closed(el, on)`: applies (`true`) or removes (`false`) the element's closed rest state. Its presence (`owned`) changes the closed side: the closed frame is `measure()` under that state instead of zeros, no edge frame, no hold. Order per change of `in`: `closed(false)` (before the reverse check, so even a no-animation environment ends open), measure open, `closed(true)`, measure closed, `closed(false)`, animate. At the end of a close: `closed(true)`, then the animation is cancelled in the same task, so the rest state takes over from the fill with no frame in between.
+  - `observe(el)`: called from the ref callback when the element attaches; its return value is called when it detaches.
+- With `owned`, a closed box equal to the open one (nothing to expand) switches at once: no animation, the callbacks fire.
+- Without plugins every hook is a call over an empty array: the frames and the timing are the ones the existing tests pin.
+- Stability: `plugins` is an effect and ref dependency. A new array every render re-runs the hold branch (`closed(true)` again, idempotent) and re-attaches the ref (`observe` restarts); correct, but wasted work. Consumers pass a module constant or `useMemo`.
+- Rejected from the agreed plan: a `start` hook that sets `data-open` and `--collapse-duration` / easing CSS variables (the consumer already has `open` and the duration it passed: one attribute on its side, rendered on the server too); a `@l1nway/collapse/clamp` subpath (the root export already tree-shakes, checked in `package.node.test.js`; a subpath needs a second entry, a shared chunk and a second `d.ts`).
+- Cost: `Collapse` +418 B min / +195 B gzip for the hooks (0.8.0: 2823 / 1487).
+
+## Clamp
+
+`src/clamp.js`, `createClamp({lines = 3, onOverflow})` and the default `clamp`: a block (a description, a `p`) that rests at `lines` lines and expands to its full height.
+
+- Closed rest: inline `max-height: <lines>lh; overflow: clip`. The closed frame is that box measured, so it is `min(lines, natural)` by itself: a 1-line text never grows, and a text that fits switches without motion.
+- No block formatting context anywhere: `overflow: clip` (the frames carry it too) clips without one, so text wraps around a `float` sibling the same way at rest, while animating and open. With a BFC the box would sit beside the float as a narrow column and the lines would re-wrap at the start and end of every animation (the Shelf bug).
+- Rejected: `display: -webkit-box` + `-webkit-line-clamp` at rest (native `…`, but `-webkit-box` always creates a BFC, see above). The "… more" mark is the consumer's pseudo-element. `overflow: hidden` while animating (BFC, the same re-wrap).
+- `lh` needs Chrome 109, Safari 16.4, Firefox 120; every browser with `lh` has `overflow: clip`, so there is no fallback. With `line-height: normal`, `lh` uses the font's normal height; a line with a taller fallback font or inline-block may cut a pixel or show a sliver. Give the element an explicit `line-height`.
+- `closed(el, false)` writes `''` to `max-height` and `overflow`: a consumer inline `overflow` / `max-height` on the element is lost. Use a class.
+- `unmountOnExit: false`: the element never leaves, it only changes size.
+- Server render and first paint are unclamped (the rest state is set in a layout effect). A consumer CSS rule such as `p:not([data-open]) {max-height: 3lh; overflow: clip}` with its own `data-open` gives the clamped first paint.
+
+## Clamp Overflow
+
+- `data-overflow` (present / absent) on the element and `onOverflow(boolean)` when it changes: is there anything to expand. Stored on the element only, so one plugin object serves any number of elements.
+- Measured in a `ResizeObserver` callback (the initial one at attach, then on every size change) and a `MutationObserver` one (text or children changed): both heights read by flipping the rest state on and off, then the state put back; same task, nothing painted, and the observed size ends unchanged, so no observer loop.
+- Skipped while a Collapse animation (`id` `ID`) is on the element: its frames lift `max-height`, so the flip would read the animated size. A width change during an animation is picked up by the next resize only.
+- Why both: closed, the box stays `lines` tall when the text changes between exactly `lines` lines and more, so `ResizeObserver` stays silent and the flag would go stale. The `MutationObserver` (`childList`, `characterData`, `subtree`, no attributes, so the flag and style writes never re-trigger it) covers that; a re-render with identical text mutates nothing and costs nothing.
+- Without `ResizeObserver` (jsdom) nothing is observed and the flag stays absent.
 
 ## Presence
 
@@ -143,5 +180,5 @@ Rationale behind the doc-keys in `src/`. The public contract is in the root `REA
 - Consumers install a git tag. A tag commit is a child of `main` that also contains `dist/` (force-added), so the consumer's install needs no build and no devDependencies. `main` itself never holds `dist/`.
 - `npm run release -- patch|minor|major|x.y.z` does it all: clean `main`, a `## x.y.z` section in `CHANGELOG.md`, version bump, `npm run check`, bump commit, detached `dist` commit, tag, `git push --atomic origin main vX.Y.Z`. A failed check aborts before any commit or tag, so consumers keep the old version.
 - Hooks (`npm run hooks` once per clone): `pre-commit` runs lint and tests, `pre-push` runs the full check. GitHub cannot reject a push; `.github/workflows/check.yml` re-runs the check there.
-- Consumers use `npm i github:l1nway/collapse#semver:^0.8.0`: npm picks the highest matching tag, the lockfile pins the commit, `npm update @l1nway/collapse` takes a newer one.
+- Consumers use `npm i github:l1nway/collapse#semver:^0.8.1`: npm picks the highest matching tag, the lockfile pins the commit, `npm update @l1nway/collapse` takes a newer one.
 - The `--no-verify` flags in the release script are deliberate: the check has just passed.

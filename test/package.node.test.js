@@ -57,9 +57,11 @@ describe('package.json', () => {
 describe('index.d.ts', () => {
     const types = text('index.d.ts')
 
-    test('declares exactly Collapse, Presence and their prop types', () => {
+    test('declares exactly the exports and their prop types', () => {
         const names = [...types.matchAll(/^export\s+(?:declare\s+)?(?:function|type|interface|const|class)\s+(\w+)/gm)]
-        expect(names.map(match => match[1]).sort()).toEqual(['Collapse', 'CollapseProps', 'Presence', 'PresenceProps'])
+        expect(names.map(match => match[1]).sort()).toEqual([
+            'ClampOptions', 'Collapse', 'CollapseProps', 'Plugin', 'Presence', 'PresenceProps', 'clamp', 'createClamp'
+        ])
         expect(types).not.toMatch(/^export\s+(default|\{|\*)/m)
     })
 
@@ -77,11 +79,13 @@ describe('build output', () => {
         code = text('dist/index.js')
     }, 120_000)
 
-    test('dist/index.js exports exactly Collapse and Presence as functions', async () => {
+    test('dist/index.js exports exactly Collapse, Presence, clamp and createClamp', async () => {
         const dist = await import(/* @vite-ignore */ `${pathToFileURL(at('dist/index.js')).href}?t=${Date.now()}`)
-        expect(Object.keys(dist).sort()).toEqual(['Collapse', 'Presence'])
+        expect(Object.keys(dist).sort()).toEqual(['Collapse', 'Presence', 'clamp', 'createClamp'])
         expect(typeof dist.Collapse).toBe('function')
         expect(typeof dist.Presence).toBe('function')
+        expect(typeof dist.createClamp).toBe('function')
+        expect(typeof dist.clamp.closed).toBe('function')
     })
 
     test('imports nothing but react and react/jsx-runtime', () => {
@@ -115,10 +119,19 @@ describe('tree shaking', () => {
         expect(code).not.toContain('borderTopWidth')
     }, 60_000)
 
-    test('a Collapse-only bundle drops the Presence code', async () => {
+    test('a Collapse-only bundle drops the Presence and clamp code', async () => {
         const code = await only('Collapse')
         expect(code).toContain('prefers-reduced-motion')
         expect(code).not.toContain('toArray')
         expect(code).not.toContain('isValidElement')
+        expect(code).not.toContain('ResizeObserver')
+        expect(code).not.toContain('data-overflow')
+    }, 60_000)
+
+    test('a clamp-only bundle drops the Collapse animation code', async () => {
+        const code = await only('clamp')
+        expect(code).toContain('ResizeObserver')
+        expect(code).not.toContain('prefers-reduced-motion')
+        expect(code).not.toContain('getComputedStyle')
     }, 60_000)
 })

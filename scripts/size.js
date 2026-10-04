@@ -5,7 +5,7 @@ import {external, jsx} from '../vite.config.js'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const entry = fileURLToPath(new URL('../src/index.js', import.meta.url)).replaceAll('\\', '/')
-const EXPORTS = [['Collapse'], ['Presence'], ['Collapse', 'Presence']]
+const EXPORTS = [['Collapse'], ['Presence'], ['clamp'], ['Collapse', 'Presence'], ['Collapse', 'clamp']]
 const ID = '\0size-entry'
 
 const measure = async names => {
