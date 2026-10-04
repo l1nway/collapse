@@ -28,6 +28,8 @@ export default defineConfig(({command}) => ({
                     browser: {
                         enabled: true,
                         headless: true,
+                        connectTimeout: 30000,
+                        fileParallelism: false,
                         provider: playwright(),
                         instances: [{browser: 'chromium'}, {browser: 'firefox'}, {browser: 'webkit'}]
                     }

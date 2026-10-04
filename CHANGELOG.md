@@ -11,7 +11,7 @@ The same height and width animations were needed in many projects. Each project 
 - `plugins` prop on `Collapse`: plain objects with optional `closed(el, on)`, `frame`, `observe(el)` and an `unmountOnExit` default. Without plugins nothing changes.
 - `clamp` / `createClamp({lines, onOverflow})`: a block that rests at N lines (default 3) and expands to its full height. Wraps around floats the whole time (`overflow: clip`, no formatting context), flags `data-overflow`, and re-measures it when the element resizes or its text changes (ResizeObserver + MutationObserver). While closed it shows the live children. Replaces Shelf's `Height`.
 - Size: `Collapse` 3241 B min / 1682 B gzip (+418 / +195 for the plugin hooks); `clamp` 811 / 491, dropped when unused.
-- CI: the workflow installs all three browsers the tests run in (chromium, firefox, webkit). Before, only chromium was installed and `npm run check` failed on the missing Firefox.
+- CI: the workflow installs all three browsers the tests run in (chromium, firefox, webkit). Before, only chromium was installed and `npm run check` failed on the missing Firefox. Browser test files now run one at a time: with three browsers in parallel a Firefox session sometimes never connected and failed the run.
 
 ## 0.8.0
 
