@@ -1,0 +1,51 @@
+{
+  "name": "@l1nway/collapse",
+  "version": "0.8.0",
+  "description": "Animate a block in and out by height or width. Zero dependencies.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./index.d.ts",
+  "files": [
+    "dist",
+    "index.d.ts",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "vite build",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "vite playground --config vite.config.js",
+    "size": "node scripts/size.js",
+    "check": "npm run lint && npm test && npm run build && npm run size",
+    "hooks": "git config core.hooksPath .githooks",
+    "release": "node scripts/release.js"
+  },
+  "peerDependencies": {
+    "react": ">=19.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/browser-playwright": "^5.0.3",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "playwright": "^1.63.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  }
+}

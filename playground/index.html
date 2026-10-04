@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang='en'>
+    <head>
+        <meta charset='utf-8'/>
+        <meta name='viewport' content='width=device-width, initial-scale=1'/>
+        <title>collapse playground</title>
+        <style>
+            body {margin: 0; font-family: system-ui, sans-serif; background: #f4f4f5; color: #18181b}
+            main {max-width: 720px; margin: 0 auto; padding: 16px}
+            .card {background: #fff; border-radius: 8px; padding: 12px 16px; margin: 0 0 16px}
+            .card h2 {margin: 0 0 8px; font-size: 1rem}
+            button {margin: 0 8px 8px 0}
+            .box {background: #e0e7ff; border: 3px solid #6366f1; padding: 8px 12px; margin: 8px 0; border-radius: 6px; white-space: pre-line}
+            .box:focus {outline: 2px solid #f59e0b; outline-offset: 2px}
+            .plain {background: #dcfce7}
+            .margin {margin: 0 0 2em}
+            .below {background: #fee2e2; margin: 0; padding: 4px 8px}
+            .row {display: flex; align-items: center; white-space: nowrap}
+            .chip {display: inline-block; background: #fde68a; padding: 2px 8px; margin: 0 6px; border-radius: 99px}
+            .item {display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid #ddd}
+            .item button {margin: 0}
+        </style>
+    </head>
+    <body>
+        <div id='root'></div>
+        <script type='module' src='./main.jsx'></script>
+    </body>
+</html>
